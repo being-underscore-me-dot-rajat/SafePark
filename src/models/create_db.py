@@ -15,15 +15,19 @@ def init_db():
     name TEXT NOT NULL,
     email TEXT NOT NULL UNIQUE,
     password TEXT NOT NULL,
-    role TEXT CHECK(role IN ('admin', 'user')) NOT NULL
+    role TEXT CHECK(role IN ('admin', 'user')) NOT NULL,
+    is_verified INTEGER DEFAULT 0
     );
     ''')
 
+    import bcrypt
+    raw_password = 'admin123'
+    hashed_password = bcrypt.hashpw(raw_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
     cursor.execute('''
     INSERT INTO users (email, password, name, role)
-    SELECT '21f3002175@ds.study.iitm.ac.in', 'admin123', 'Admin SafePark', 'admin'
-    WHERE NOT EXISTS (SELECT 1 FROM users WHERE role='admin');
-    ''')
+    SELECT ?, ?, ?, ?
+    WHERE NOT EXISTS (SELECT 1 FROM users WHERE role = 'admin');
+''', ('21f3002175@ds.study.iitm.ac.in', hashed_password, 'Admin SafePark', 'admin'))
 
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS parking_lots (
