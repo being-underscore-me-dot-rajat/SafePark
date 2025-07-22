@@ -24,15 +24,15 @@ def init_db():
     raw_password = 'admin123'
     hashed_password = bcrypt.hashpw(raw_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
     cursor.execute('''
-    INSERT INTO users (email, password, name, role)
-    SELECT ?, ?, ?, ?
+    INSERT INTO users (email, password, name, role,is_verified)
+    SELECT ?, ?, ?, ?,?
     WHERE NOT EXISTS (SELECT 1 FROM users WHERE role = 'admin');
-''', ('21f3002175@ds.study.iitm.ac.in', hashed_password, 'Admin SafePark', 'admin'))
+''', ('21f3002175@ds.study.iitm.ac.in', hashed_password, 'Admin SafePark', 'admin',1))
 
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS parking_lots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
+    name TEXT NOT NULL UNIQUE,
     total_spots INTEGER NOT NULL,
     price_per_hour REAL NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -45,9 +45,8 @@ def init_db():
     lot_id INTEGER NOT NULL,
     address_line1 TEXT NOT NULL,
     address_line2 TEXT,
-    pincode TEXT NOT NULL,
-    latitude REAL,
-    longitude REAL,
+    latitude REAL NOT NULL,
+    longitude REAL NOT NULL,
     FOREIGN KEY (lot_id) REFERENCES parking_lots(id) ON DELETE CASCADE
     );
     ''')
@@ -57,7 +56,6 @@ def init_db():
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     lot_id INTEGER NOT NULL,
     spot_number TEXT NOT NULL,
-    status TEXT CHECK(status IN ('available', 'occupied')) NOT NULL DEFAULT 'available',
     FOREIGN KEY (lot_id) REFERENCES parking_lots(id) ON DELETE CASCADE,
     UNIQUE (lot_id, spot_number)
     );
@@ -68,10 +66,9 @@ def init_db():
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
     spot_id INTEGER NOT NULL,
-    start_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    start_time DATETIME NOT NULL,
     end_time DATETIME,
     cost REAL,
-    remarks TEXT,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (spot_id) REFERENCES parking_spots(id) ON DELETE CASCADE
     );

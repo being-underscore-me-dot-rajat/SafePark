@@ -32,7 +32,7 @@ el.addEventListener('click', (e) => {
   popupData.value = {
     title: '📍 Jaipur Parking',
     lat: 26.88426881385905,
-    lng: 75.71019784099505,
+    lng: 75.71019784099505, 
   };
 
   showPopup.value = true;

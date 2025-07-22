@@ -1,9 +1,10 @@
 import sqlite3, os, bcrypt, jwt, datetime
 from . import dbconnect
-from flask import jsonify
+from flask import request, jsonify, g
 import random, smtplib
 import redis
-from app import celery
+from controllers.Celery.celery_worker import celery
+from functools import wraps
 
 redis_client = redis.StrictRedis(host='localhost', port=6379, db=0, decode_responses=True)
 
@@ -11,10 +12,31 @@ JWT_SECRET = 'RcFaMGQ0/Zj4pVAeXn9GHaiixdOlWe0PsMtMmVZZUHg='
 JWT_ALGORITHM = 'HS256'
 JWT_EXP_DELTA_SECONDS = 3600 #Token Expiration time
 
-# celery = None 
+def jwt_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = None
+        auth_header = request.headers.get('Authorization')
 
-@celery.task
-@celery.task
+        if auth_header and auth_header.startswith('Bearer '):
+            token = auth_header.split(' ')[1]
+
+        if not token:
+            return jsonify({'error': 'Authorization token is missing'}), 401
+
+        try:
+            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            g.user_id = payload['user_id']  # This makes user_id accessible in your route
+            g.user_role = payload.get('role', 'user')
+        except jwt.ExpiredSignatureError:
+            return jsonify({'error': 'Token has expired'}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'error': 'Invalid token'}), 401
+
+        return f(*args, **kwargs)
+    return decorated_function
+
+@celery.task(name='controllers.auth.send_otp_email')  # Explicitly name the task (optional)
 def send_otp_email(recipient, otp):
     print("OTP Task: Sending email to", recipient, "with OTP:", otp)
     message = f"Subject: Your OTP Verification Code\n\nYour OTP is: {otp}"
@@ -26,7 +48,7 @@ def send_otp_email(recipient, otp):
         server.quit()
         print("Email sent successfully to", recipient)
     except Exception as e:
-        print("Email failed:", str(e))  # Log this
+        print("Email failed:", str(e))
 
 
 def generate_token(user_id, role):
@@ -46,14 +68,14 @@ def login(data):
 
     conn = dbconnect.getconnection()
     cursor = conn.cursor()
-    cursor.execute("SELECT name, email, password, role, is_verified FROM users WHERE email = ?", (email,))
+    cursor.execute("SELECT id,name, email, password, role, is_verified FROM users WHERE email = ?", (email,))
     user = cursor.fetchone()
     conn.close()
 
     if not user:
         return {"error": "Invalid email or password"}, 401
 
-    name, email, hashed_pw, role, is_verified = user
+    user_id,name, email, hashed_pw, role, is_verified = user
 
     if not bcrypt.checkpw(password.encode('utf-8'), hashed_pw.encode('utf-8')):
         return {"error": "Invalid email or password"}, 401
@@ -66,7 +88,9 @@ def login(data):
         }, 403
 
     payload = {
+        "user_id": user_id,
         "email": email,
+        "role": role,
         "exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=JWT_EXP_DELTA_SECONDS)
     }
 
@@ -76,6 +100,7 @@ def login(data):
         "message": "Login successful",
         "token": token,
         "user": {
+            "id":user_id,
             "name": name,
             "email": email,
             "role": role
@@ -109,8 +134,10 @@ def signup(data):
     finally:
         conn.close()
 
-    # Generate OTP and store in Redis
     sending_otp(email)
+    return jsonify({
+        "message": "User registered. OTP sent to email for verification."
+    }), 201
 
 def sending_otp(email):
     import random
@@ -118,10 +145,10 @@ def sending_otp(email):
     print("otp",otp)
     redis_client.setex(f"otp:{email}", 300, otp)  
 
-    send_otp_email(email, otp)
+    send_otp_email.delay(email, otp)
 
     return jsonify({
-        "message": "User registered. OTP sent to email for verification."
+        "message": "Please enter the OTP sent to email for verification."
     }), 201
 
 

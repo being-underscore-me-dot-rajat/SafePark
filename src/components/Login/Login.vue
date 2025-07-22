@@ -83,6 +83,11 @@ export default {
 
         if (!response.ok) throw new Error(data.message || 'Login failed');
         this.showNotification(data.message, "success");
+        if (response.ok) {
+          localStorage.setItem('token', data.token); 
+          localStorage.setItem('user', JSON.stringify(data.user));
+        }
+
 
         if (data.user.role === 'admin') {
           this.$router.push('/admin_dashboard');
