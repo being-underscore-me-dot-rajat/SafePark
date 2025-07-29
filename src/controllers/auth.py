@@ -26,7 +26,7 @@ def jwt_required(f):
 
         try:
             payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-            g.user_id = payload['user_id']  # This makes user_id accessible in your route
+            g.user_id = payload['user_id']
             g.user_role = payload.get('role', 'user')
         except jwt.ExpiredSignatureError:
             return jsonify({'error': 'Token has expired'}), 401
@@ -36,19 +36,37 @@ def jwt_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-@celery.task(name='controllers.auth.send_otp_email')  # Explicitly name the task (optional)
-def send_otp_email(recipient, otp):
-    print("OTP Task: Sending email to", recipient, "with OTP:", otp)
-    message = f"Subject: Your OTP Verification Code\n\nYour OTP is: {otp}"
+@celery.task(name='controllers.auth.send_email')
+def send_email(subject, recipient, html_body):
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+
     try:
+        # Create message container
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = 'safepark123@gmail.com'
+        msg['To'] = recipient
+
+        # Attach HTML content
+        msg.attach(MIMEText(html_body, 'html'))
+
+        # Send the message
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
-        server.login('safepark123@gmail.com', 'ssww fanb mqkj nqrs') 
-        server.sendmail('safepark123@gmail.com', recipient, message)
+        server.login('safepark123@gmail.com', 'ssww fanb mqkj nqrs')
+        server.sendmail(msg['From'], [recipient], msg.as_string())
         server.quit()
-        print("Email sent successfully to", recipient)
+
+        print(f"Email sent successfully to {recipient}")
     except Exception as e:
         print("Email failed:", str(e))
+
+def sendotp(recipient, otp):
+    print("OTP Task: Sending email to", recipient, "with OTP:", otp)
+    message = f"Subject: Your OTP Verification Code\n\nYour OTP is: {otp}"
+    send_email.delay(message,recipient)
 
 
 def generate_token(user_id, role):
@@ -145,7 +163,7 @@ def sending_otp(email):
     print("otp",otp)
     redis_client.setex(f"otp:{email}", 300, otp)  
 
-    send_otp_email.delay(email, otp)
+    sendotp(email, otp)
 
     return jsonify({
         "message": "Please enter the OTP sent to email for verification."

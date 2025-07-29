@@ -1,0 +1,20 @@
+Analytics
+    1. Cost graph with time (Bar Graph)
+        1.1 Average cost
+        1.2 Median cost
+    2. Average Duration of parking with time(Zoomable line graph)
+        1.1 Average Duration
+        1.2 Median Duration
+    3. User Bookings with time(Line Graph)
+    4. Parking Lots with the no. of bookings (Pie Chart Graph)
+    5. Booking history of lots with time (Line Graph)
+
+CSS changes
+    1.Different Combinations from the same pallete for user and admin dashboards
+    2.All the confirmatory messages, or alerts or error messages should be uniform and should be visible for 10 seconds and rhen disappear
+    3.
+
+Core funcitonalities
+    1. Add specific spot deletion option subject to reservation
+    2. ***** Displaying Cost breakdown for users and admin *****
+    3. Backend Tasks

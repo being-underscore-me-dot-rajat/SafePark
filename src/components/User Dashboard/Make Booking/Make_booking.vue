@@ -5,10 +5,10 @@
     <form @submit.prevent="confirmBooking">
       <div class="form-group">
         <label>Parking Lot</label>
-        <select v-model="booking.spot_id" required>
+        <select v-model="selectedLotId" required>
           <option disabled value="">Select a parking lot</option>
           <option v-for="lot in lots" :key="lot.id" :value="lot.id">
-            {{ lot.name }} ({{ lot.address_line1 }})
+            {{ lot.name }} ({{ lot.address_line1 }}) - Cost per hour: {{ lot.price_per_hour }}
           </option>
         </select>
       </div>
@@ -17,10 +17,11 @@
         <label>Start Time</label>
         <input
           type="datetime-local"
-          v-model="booking.start_time"
+          v-model="rawStartTime"
           :min="minDateTime"
+          :step="60"
           required
-          @change="unlockEndTime"
+          @change="updateStartTime"
         />
       </div>
 
@@ -28,13 +29,15 @@
         <label>End Time</label>
         <input
           type="datetime-local"
-          v-model="booking.end_time"
-          :min="booking.start_time"
-          :disabled="!booking.start_time"
+          v-model="rawEndTime"
+          :min="rawStartTime"
+          :step="60"
+          :disabled="!rawStartTime"
+          @change="updateEndTime"
         />
       </div>
 
-      <button type="submit">Book Now</button>
+      <button type="submit" :disabled="!selectedLotId || !rawStartTime">Book Now</button>
     </form>
 
     <p v-if="message" class="message">{{ message }}</p>
@@ -45,12 +48,14 @@
 import { authFetch } from '../../../Utils/authFetch.js';
 
 export default {
-  props: ['switchTab'], // function from parent to switch active tab
   data() {
     return {
       lots: [],
+      selectedLotId: '',
+      rawStartTime: '',
+      rawEndTime: '',
       booking: {
-        user_id: 1, 
+        user_id: 1,  
         spot_id: '',
         start_time: '',
         end_time: '',
@@ -75,24 +80,52 @@ export default {
     },
     setMinDateTime() {
       const now = new Date();
-      now.setSeconds(0, 0); 
-      this.minDateTime = now.toISOString().slice(0, 16);
+      this.minDateTime = now.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm (no seconds)
     },
-    unlockEndTime() {
-      if (this.booking.start_time) {
-        this.booking.end_time = '';
+    updateStartTime() {
+      if (this.rawStartTime) {
+        this.booking.start_time = this.toISTISOString(this.rawStartTime);
+        this.rawEndTime = '';  // Reset end time if start changes
       }
     },
-    async confirmBooking() {
-      const confirmed = window.confirm("Do you want to confirm this booking?");
-      if (!confirmed) return;
+    updateEndTime() {
+      if (this.rawEndTime) {
+        this.booking.end_time = this.toISTISOString(this.rawEndTime);
+      }
+    },
+    toISTISOString(localDateTime) {
+  // localDateTime is a string from <input type="datetime-local"> (no timezone info)
+  // Parse it as local time:
+  const date = new Date(localDateTime);
 
-      if (new Date(this.booking.start_time) < new Date()) {
+  // Get UTC time in ms:
+  const utcTime = date.getTime() + (date.getTimezoneOffset() * 60 * 1000);
+
+  // IST offset in ms
+  const istOffsetMs = 5.5 * 60 * 60 * 1000;
+
+  // Create date object in IST:
+  const istDate = new Date(utcTime + istOffsetMs);
+
+  // Format as YYYY-MM-DDTHH:mm:ss+05:30
+  const year = istDate.getFullYear();
+  const month = String(istDate.getMonth() + 1).padStart(2, '0');
+  const day = String(istDate.getDate()).padStart(2, '0');
+  const hours = String(istDate.getHours()).padStart(2, '0');
+  const minutes = String(istDate.getMinutes()).padStart(2, '0');
+
+  return `${year}-${month}-${day}T${hours}:${minutes}+05:30`;
+},
+    async confirmBooking() {
+      const startDate = new Date(this.booking.start_time.slice(0, 19));  // Parse without offset for comparison
+      const endDate = new Date(this.booking.end_time.slice(0, 19));
+      const now = new Date();
+
+      if (startDate < now) {
         this.message = "Start time cannot be in the past.";
         return;
       }
-
-      if (new Date(this.booking.end_time) <= new Date(this.booking.start_time)) {
+      if (endDate <= startDate) {
         this.message = "End time must be after start time.";
         return;
       }
@@ -100,11 +133,17 @@ export default {
       await this.submitBooking();
     },
     async submitBooking() {
+      const selectedLot = this.lots.find(lot => lot.id === this.selectedLotId);
+      if (!selectedLot) {
+        this.message = "Lot not found.";
+        return;
+      }
+
       const payload = {
-        spot_id: this.booking.spot_id,
-        start_time: this.booking.start_time,
-        end_time: this.booking.end_time,
-        cost: this.calculateCost(this.booking.start_time, this.booking.end_time),
+        spot_id: this.selectedLotId, 
+        start_time: this.booking.start_time,  // IST ISO format
+        end_time: this.booking.end_time,      // IST ISO format
+        cost: this.calculateCost(this.booking.start_time, this.booking.end_time, selectedLot.price_per_hour),
         remarks: this.booking.remarks
       };
 
@@ -114,77 +153,22 @@ export default {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-
         const data = await res.json();
         this.message = data.message || "Booking successful.";
-        window.confirm("Booking successful");
-        this.$emit('booking-success'); // 👈 emit event to parent
+        window.alert("Booking successful");
+        this.$emit('booking-success');
       } catch (err) {
         console.error("Booking failed", err);
         this.message = "Booking failed. Please try again.";
       }
     },
-    calculateCost(start, end) {
-      const startTime = new Date(start);
-      const endTime = new Date(end);
+    calculateCost(start, end, rate) {
+      const startTime = new Date(start.slice(0, 19));  // Parse without offset
+      const endTime = new Date(end.slice(0, 19));
       const hours = (endTime - startTime) / (1000 * 60 * 60);
-      const rate = 50; // Fixed rate
-      return Math.ceil(hours * rate);
+      return Math.ceil(hours) * rate;
     }
   }
 };
 </script>
 
-<style scoped>
-.booking-container {
-  max-width: 600px;
-  margin: 0 auto;
-  background: #f5f9ff;
-  padding: 2rem;
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
-}
-
-h2 {
-  color: #123c78;
-  margin-bottom: 1rem;
-}
-
-.form-group {
-  margin-bottom: 1.2rem;
-}
-
-label {
-  display: block;
-  margin-bottom: 6px;
-  font-weight: bold;
-  color: #2c3e50;
-}
-
-input,
-select {
-  width: 100%;
-  padding: 0.6rem;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-}
-
-button {
-  background-color: #4c72e7;
-  color: white;
-  padding: 0.6rem 1.5rem;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-button:hover {
-  background-color: #375bc1;
-}
-
-.message {
-  margin-top: 1rem;
-  font-weight: bold;
-  color: #2e7d32;
-}
-</style>

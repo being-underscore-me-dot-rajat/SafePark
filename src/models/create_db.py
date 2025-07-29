@@ -69,6 +69,7 @@ def init_db():
     start_time DATETIME NOT NULL,
     end_time DATETIME,
     cost REAL,
+    duration Real,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (spot_id) REFERENCES parking_spots(id) ON DELETE CASCADE
     );

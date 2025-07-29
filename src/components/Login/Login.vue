@@ -10,7 +10,7 @@
 
       <div class="input-group">
         <label>Email</label>
-        <input type="email" v-model="email" required />
+        <input type="email" v-model="email" name="email" autocomplete="username" required/>
       </div>
 
       <div class="input-group">
@@ -86,6 +86,7 @@ export default {
         if (response.ok) {
           localStorage.setItem('token', data.token); 
           localStorage.setItem('user', JSON.stringify(data.user));
+          localStorage.setItem("role", data.user.role);
         }
 
 

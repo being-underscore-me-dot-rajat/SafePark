@@ -54,27 +54,86 @@ from flask import jsonify,g
 from datetime import datetime
 
 def add_booking(data):
-    lot_id = data.get("spot_id")
+    from .editindb import parse_iso_time
+    lot_id = data.get("spot_id")  
     start_time = data.get("start_time")
     end_time = data.get("end_time")
     cost = data.get("cost")
-
+    # print(lot_id,start_time,end_time,cost)
     user_id = g.user_id 
-
     conn = getconnection()
     cursor = conn.cursor()
-    spot_id=book_spot(lot_id,start_time)
+
+    spot_id = book_spot(lot_id, start_time)
+
+    if end_time and cost == None:
+        # print("cost updation called")
+        from datetime import datetime
+        import math
+
+        # Parse times
+        start_dt = parse_iso_time(start_time)
+        end_dt = parse_iso_time(end_time)
+
+        if not isinstance(start_dt, datetime) or not isinstance(end_dt, datetime):
+            conn.close()
+            return jsonify({"error": "Invalid datetime format"}), 400
+
+        if end_dt <= start_dt:
+            conn.close()
+            return jsonify({"error": "End time must be after start time"}), 400
+
+        cursor.execute("SELECT price_per_hour FROM parking_lots WHERE id = ?", (lot_id,))
+        price_row = cursor.fetchone()
+        if not price_row:
+            conn.close()
+            return jsonify({"error": "Lot not found"}), 404
+
+        price_per_hour = price_row[0]
+        duration_hours = (end_dt - start_dt).total_seconds() / 3600.0
+        cost = math.ceil(duration_hours) * price_per_hour
+
+            
+        cursor.execute("SELECT name FROM parking_lots WHERE id=?", (lot_id,))
+        lot_name = cursor.fetchone()[0]
+
+        cursor.execute("SELECT email FROM users WHERE id=?", (user_id,))
+        user_email = cursor.fetchone()[0]
+
+        cursor.execute('''Select spot_number from parking_spots where id=?''',(spot_id,))
+        spot_number=cursor.fetchone()[0]
+
+        from controllers.Celery.tasks import booking_confirmation_email_with_cost
+        booking_confirmation_email_with_cost(user_email, lot_name, spot_number, start_time, end_time, cost)
+
+    elif cost == None:
+        # print("Nill Cost updated")
+        cost = None  
+        cursor.execute("SELECT name FROM parking_lots WHERE id=?", (lot_id,))
+        lot_name = cursor.fetchone()[0]
+
+        cursor.execute("SELECT email FROM users WHERE id=?", (user_id,))
+        user_email = cursor.fetchone()[0]
+
+        cursor.execute('''Select spot_number from parking_spots where id=?''',(spot_id,))
+        spot_number=cursor.fetchone()[0]
+
+        from controllers.Celery.tasks import booking_confirmation_email_without_cost
+        booking_confirmation_email_without_cost(user_email, lot_name, spot_number, start_time)
+
+    # Insert booking
     cursor.execute('''
         INSERT INTO bookings (user_id, spot_id, start_time, end_time, cost)
         VALUES (?, ?, ?, ?, ?)
     ''', (user_id, spot_id, start_time, end_time, cost))
 
     conn.commit()
-
     if cursor.rowcount == 0:
+        conn.close()
         return jsonify({"message": "Booking failed"}), 500
 
     return jsonify({"message": "Booking successful"}), 200
+
 
 def book_spot(lot_id, requested_start_time):
     import random

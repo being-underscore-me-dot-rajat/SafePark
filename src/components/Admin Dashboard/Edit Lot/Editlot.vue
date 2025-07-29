@@ -1,11 +1,9 @@
 <template>
   <Loading v-if="loading" />
-  <div class="edit-lot-wrapper">
+  <div v-else class="edit-lot-wrapper">
     <h2>Edit Parking Lots</h2>
 
     <div v-if="error" class="error">{{ error }}</div>
-
-    <!-- Summary Table -->
     <table class="summary-table">
       <thead>
         <tr>

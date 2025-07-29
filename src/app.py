@@ -74,6 +74,19 @@ def get_lot_coords(lot_name):
 def update_booking_end_time():
     return editindb.provide_end_time_and_cost(request.get_json())
 
+@app.route("/getusers", methods=["GET"])
+@jwt_required  
+def get_all_users():
+    return jsonify(getfromdb.getusers()), 200
+
+@app.route('/userhistory/<int:user_id>', methods=['GET'])
+def user_history(user_id):
+    return jsonify(getfromdb.user_bookings(user_id))
+
+@app.route("/getallbookings", methods=["GET"])
+@jwt_required  
+def getallbookings():
+    return jsonify(getfromdb.getallbookings()), 200
 
 if __name__ == '__main__':
     app.run(debug=True)

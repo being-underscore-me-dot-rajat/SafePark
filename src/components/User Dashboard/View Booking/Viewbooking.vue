@@ -3,32 +3,41 @@
     <Loading v-if="loading" />
     <div v-else>
       <h2>Your Bookings</h2>
-      <table v-if="bookings.length">
+      <div class="table-container" v-if="bookings.length">
+      <table >
         <thead>
           <tr>
             <th>Lot</th>
             <th>Spot</th>
+            <th>Price per hour</th>
             <th>Start Time</th>
             <th>End Time</th>
+            <th>Duration</th>
             <th>Cost</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="booking in bookings" :key="booking.id">
+          <tr v-for="booking in [...bookings].reverse()" :key="booking.id">
             <td>
               <a href="#" @click.prevent="redirectToMap(booking.lot_name)">
                 {{ booking.lot_name }} 📍
               </a>
             </td>
             <td>{{ booking.spot_number }}</td>
-            <td>{{ booking.start_time }}</td>
+            <td>{{ booking.price_per_hour }}</td>
+            <td>{{ formatDateTime(booking.start_time) }}</td>
             <td>
                 <button v-if="!booking.end_time" @click="openEndTimeModal(booking)">Provide End Time</button>
                 <div v-else>{{  formatDateTime(booking.end_time) }}</div>
             </td>
             <td>
+                <div v-if="booking.end_time">{{ calculateDurationHours(booking.start_time, booking.end_time) }} hrs</div>
+                <span class="cost-unavailable" v-else>Ongoing</span>
+            </td>
+
+            <td>
               <template v-if="booking.end_time">
-                ₹{{ booking.cost || calculateCost(booking.start_time, booking.end_time) }}
+                ₹{{ booking.cost  }}
               </template>
               <template v-else>
                 <span class="cost-unavailable">Pending</span>
@@ -37,6 +46,7 @@
           </tr>
         </tbody>
       </table>
+      </div>
       <p v-else>No bookings found.</p>
       <div v-if="showModal" class="modal">
         <div class="modal-content">
@@ -63,6 +73,32 @@ import router from '../../../router'
 
 const bookings = ref([])
 const loading = ref(true)
+
+function toISTISOString(localDateTime) {
+  const date = new Date(localDateTime);
+
+  const utcTime = date.getTime() + (date.getTimezoneOffset() * 60 * 1000);
+  const istOffsetMs = 5.5 * 60 * 60 * 1000;
+  const istDate = new Date(utcTime + istOffsetMs);
+
+  const year = istDate.getFullYear();
+  const month = String(istDate.getMonth() + 1).padStart(2, '0');
+  const day = String(istDate.getDate()).padStart(2, '0');
+  const hours = String(istDate.getHours()).padStart(2, '0');
+  const minutes = String(istDate.getMinutes()).padStart(2, '0');
+
+  
+  return `${year}-${month}-${day}T${hours}:${minutes}+05:30`;
+}
+
+const calculateDurationHours = (start, end) => {
+  const startTime = new Date(start);
+  const endTime = new Date(end);
+  const durationMs = endTime - startTime;
+  const durationHours = durationMs / (1000 * 60 * 60);
+  return durationHours.toFixed(2); 
+}
+
 
 const fetchBookings = async () => {
   try {
@@ -111,7 +147,7 @@ const errorMessage = ref("")
 
 const openEndTimeModal = (booking) => {
   selectedBooking.value = booking
-  endTimeInput.value = new Date().toISOString().slice(0, 16) // current time in input format
+  endTimeInput.value = toISTISOString(new Date()).slice(0, 16)
   showModal.value = true
 }
 
@@ -124,41 +160,39 @@ const closeModal = () => {
 
 
 const submitEndTime = async () => {
-  if (!selectedBooking.value || !endTimeInput.value) return
+  if (!selectedBooking.value || !endTimeInput.value) return;
 
-  const endTime = new Date(endTimeInput.value)
-  const now = new Date()
-  const startTime = new Date(selectedBooking.value.start_time)
+  const endTime = new Date(endTimeInput.value);
+  const now = new Date();
+  const startTime = new Date(selectedBooking.value.start_time);
 
   if (endTime <= startTime) {
-    errorMessage.value = "End time must be after start time."
-    return
-  }
-  if (endTime > now) {
-    errorMessage.value = "End time cannot be in the future."
-    return
+    errorMessage.value = "End time must be after start time.";
+    return;
   }
 
   try {
+    const formattedEndTime = toISTISOString(endTime)
+
     const res = await authFetch(`http://localhost:5000/provideendtime`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         booking_id: selectedBooking.value.id,
-        end_time: endTime.toISOString()
+        end_time: formattedEndTime // <- Consistent with Make Booking
       })
-    })
+    });
 
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error || "Something went wrong")
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Something went wrong");
 
-    // Refresh the booking list
-    await fetchBookings()
-    closeModal()
+    await fetchBookings();
+    closeModal();
   } catch (err) {
-    errorMessage.value = err.message
+    errorMessage.value = err.message;
   }
-}
+};
+
 
 onMounted(() => {
   fetchBookings()
@@ -201,7 +235,7 @@ onMounted(() => {
 }
 table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse:none;
 }
 th, td {
   padding: 12px;
@@ -230,4 +264,20 @@ button:hover {
   color: #f39c12;
   font-weight: bold;
 }
+
+.table-container::-webkit-scrollbar {
+  width: 8px;
+}
+.table-container::-webkit-scrollbar-thumb {
+  background-color: #aaa;
+  border-radius: 4px;
+}
+.table-container {
+  max-height: 60vh; /* or any height you prefer */
+  overflow-y: auto;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+
+
 </style>

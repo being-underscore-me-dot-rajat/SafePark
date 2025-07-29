@@ -25,20 +25,25 @@
 
 <script>
 import View_lots from './View Lots/View_lots.vue'
+import Viewusers from './View Users/Viewusers.vue'
 import Addlot from './Add Space/AddLot.vue'
 import Editlot from './Edit Lot/Editlot.vue'
+import ViewBookings from './ViewBookings/ViewBookings.vue'
 import Loading from '../../Utils/Loading.vue'
+
 
 export default {
   components: {
     View_lots,
     Addlot,
     Editlot,
-    Loading
+    Loading,
+    Viewusers,
+    ViewBookings
   },
   data() {
     return {
-      tabs: ['View Lots', 'Add Lot', 'Edit Lot Details', 'p', 'q', 'r'],
+      tabs: ['View Lots', 'Add Lot', 'Edit Lot Details', 'View Users', 'View Bookings', 'r'],
       activeTab: 'View Lots',
       loading: true,
       accessGranted: false
@@ -53,6 +58,10 @@ export default {
           return Addlot
         case 'Edit Lot Details':
           return Editlot
+        case 'View Users':
+          return Viewusers
+        case 'View Bookings':
+          return ViewBookings
         default:
           return null
       }

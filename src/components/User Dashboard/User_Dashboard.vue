@@ -38,18 +38,20 @@
 <script>
 import Make_booking from './Make Booking/Make_booking.vue';
 import View_booking from './View Booking/Viewbooking.vue';
+import View_lots from './View Lots/View_lots.vue'
 import Loading from '../../Utils/Loading.vue'
 
 export default {
     components: {
     Make_booking,
     View_booking,
-    Loading
+    Loading,
+    View_lots
   },
   data() {
     return {
-      tabs: [ 'Make Booking', 'View Booking', 'r'],
-      activeTab: 'Make Booking',
+      tabs: [ 'View Lots','Make Booking', 'View Booking', 'r'],
+      activeTab: 'View Lots',
       user:{},
       loading:true,
     }
@@ -61,6 +63,8 @@ export default {
           return Make_booking;
         case 'View Booking':
           return View_booking;
+        case 'View Lots':
+          return View_lots;
 
         default:
           return null;
@@ -93,7 +97,7 @@ export default {
 .dashboard-container {
   display: flex;
   width: 95vw;
-  height: 85vh;
+  height: 78vh;
   margin: 2rem auto;
   border: 2px solid #4c72e7;
   border-radius: 8px;
