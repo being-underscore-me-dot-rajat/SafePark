@@ -73,7 +73,7 @@ SafePark/
 │ └── store/ # State management
 └── package.json
 
-📊 Analytics Preview
+##📊 Analytics Preview
 Cost Graph (Bar) – View parking revenue trends.
 
 Parking Duration (Zoomable Line) – Analyze average & median durations.
@@ -82,12 +82,12 @@ User Bookings (Line) – Monitor user activity trends.
 
 Parking Lots vs Bookings (Pie) – See distribution of bookings across lots.
 
-📬 Email Templates
+##📬 Email Templates
 OTP Email: Styled HTML mail for user verification.
 
 Booking Confirmation Email: Includes lot name, spot, and booking time details.
 
-🧪 Testing
+##🧪 Testing
 API testing done using Postman.
 
 Frontend testing with manual flows.
