@@ -113,7 +113,7 @@ function selectLot(lot) {
 function initMap() {
   if (!ola.value) {
     ola.value = new OlaMaps({
-      apiKey: 'JrfosptCCKRHaDu9mMXXESTPNiNF7r4aObU8R3Gy',
+      apiKey: ''Bring_your_own_😒',
     })
   }
 
