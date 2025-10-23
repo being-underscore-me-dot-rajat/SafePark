@@ -16,7 +16,7 @@ onMounted(() => {
   // console.log('Initializing OlaMaps...')
 
   olaMaps.value = new OlaMaps({
-    apiKey: 'JrfosptCCKRHaDu9mMXXESTPNiNF7r4aObU8R3Gy',
+    apiKey: 'Bring_your_own_😒',
   })
 
   map.value = olaMaps.value.init({
