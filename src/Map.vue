@@ -14,7 +14,7 @@ const popupData = ref({ title: '', lat: null, lng: null });
 
 onMounted(() => {
   const Maps = new OlaMaps({
-    apiKey: "JrfosptCCKRHaDu9mMXXESTPNiNF7r4aObU8R3Gy",
+    apiKey: "Bring_your_own_😒",
   })
 const el = document.createElement('div');
 el.className = 'custom-marker';
